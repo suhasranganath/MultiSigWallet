@@ -1,0 +1,480 @@
+<!doctype html>
+    <html lang="en">
+        <head>
+            <title>MultiSig DAO Smart Contract</title>
+            <!-- Required meta tags -->
+            <meta charset="utf-8">
+            <link rel="apple-touch-icon" sizes="76x76" href="../assets/img/apple-icon.png">
+            <link rel="icon" type="image/png" href="../assets/img/favicon.png">
+            <meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0" name="viewport" />
+        
+            <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1" />
+
+            <!--     Fonts and icons     -->
+            <link rel="stylesheet" type="text/css" href="https://fonts.googleapis.com/css?family=Roboto:300,400,500,700|Roboto+Slab:400,700|Material+Icons" />
+            <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/font-awesome/latest/css/font-awesome.min.css">
+
+            <link href="assets/css/material-dashboard.css?v=2.1.0" rel="stylesheet" />
+            <link href="style.css" rel="stylesheet" />
+            <!-- Smart Contract related scripts-->
+            <script src="./web3.min.js"></script>
+            <!--<script src="https://cdn.jsdelivr.net/gh/ethereum/web3.js/dist/web3.min.js"></script>-->
+            <script src="./MultiSigDAO.js"></script>
+            <script>
+                function contribute(){
+                    var value_sent = $('#contribute-value').val();
+                    console.log(value_sent);
+
+                    web3js.eth.sendTransaction({from:account, value:value_sent, to:window.contractAddress})
+                    .on('transactionHash', function(hash) {
+                        $('#contribute-txid').text("Tx Hash:\n"+hash);
+                        totalContributors();
+                    })
+                }
+
+                function endContributionPhase(){
+                    contract.methods.endContributionPeriod().send()
+                    .on('transactionHash', function(hash) {
+                        $('#endContributionPhase-txid').text("Tx Hash:\n"+hash);
+                        currentPhase();
+                    });                    
+                }
+
+                function approve(){
+                    var beneficiary_addr = $('#beneficiary-addr').val();
+                    contract.methods.approve(beneficiary_addr).send()
+                    .on('transactionHash', function(hash) {
+                        $('#approve-txid').text("Tx Hash:\n"+hash);
+                        totalOpenProposals();
+                    });
+                }
+
+                function reject(){
+                    var beneficiary_addr = $('#beneficiary-addr').val();
+                    contract.methods.approve(beneficiary_addr).send()
+                    .on('transactionHash', function(hash) {
+                        $('#reject-txid').text("Tx Hash:\n"+hash);
+                        totalOpenProposals();
+                    });
+                }
+                function checkContribution(){
+                    var contributor_addr = $('#contributor-addr').val();
+                    contract.methods.getContributorAmount(contributor_addr).call()
+                    .then(function(contributionValue){
+                        $('#contribution-value').text("Contribution in Wei:\n"+contributionValue);
+                    });
+                }
+
+                function totalContributors(){
+                    contract.methods.listContributors().call()
+                    .then(function(arrTotalContributors){
+                        $('#total-contributors').text(arrTotalContributors.length);
+                    });
+                }
+
+                function totalOpenProposals(){
+                    contract.methods.listOpenBeneficiariesProposals().call()
+                    .then(function(arrTotalOpenProposals){
+                        $('#total-open-proposals').text(arrTotalOpenProposals.length);
+                    })
+                }
+
+                function currentPhase(){
+                    console.log("Testing");
+                    contract.methods.isContributionPeriod().call()
+                    .then(function(phaseValue){
+                        if(phaseValue){
+                            $('#phase-output').text("Contribution Phase");
+                            console.log(phaseValue);
+                        }else{
+                            $('#phase-output').text("Proposal Phase");
+                            console.log(phaseValue);
+                        }
+                    });
+                }
+
+                function sendProposal(){
+                    var proposal_value = $('#proposal-value').val();
+                    console.log(proposal_value);
+
+                    contract.methods.submitProposal(proposal_value).send()
+                    .on('transactionHash', function(hash) {
+                        $('#proposal-txid').text("Tx Hash:\n"+hash);
+                        totalOpenProposals();
+                    });
+                }
+
+                function withdrawReq(){
+                    var withdraw_value = $('#withdraw-value').val();
+                    contract.methods.withdraw(withdraw_value).send()
+                    .on('transactionHash', function(hash) {
+                        $('#withdraw-txid').text("Tx Hash:\n"+hash);
+                        totalOpenProposals();
+                    });
+                }
+
+
+                function eventsRC(){
+                    //let events = product.allEvents({fromBlock: 0, toBlock: 'latest'})
+                    contract.getPastEvents("ReceivedContribution",{fromBlock:0, toBlock:'latest'}, (error, logs)=>{
+                        logs.forEach(function(log){
+                            $('#event-log-rc').append("<p>Event:ReceivedContribution: Value: "+log.returnValues._valueInWei+ " Wei, Contributor: " + log.returnValues._contributor+ "</p>");
+                        });
+                    });
+                }
+                function eventsPS(){
+                    contract.getPastEvents("ProposalSubmitted",{fromBlock:0, toBlock:'latest'}, (error, logs)=>{
+                        logs.forEach(function(log){
+                            $('#event-log-ps').append("<p>Event:ProposalSubmitted: Value: "+log.returnValues._valueInWei+ " Wei, Beneficiary: " + log.returnValues._beneficiary+ "</p>");
+                        });
+                    });
+                }
+                function eventsPA(){
+                    contract.getPastEvents("ProposalApproved",{fromBlock:0, toBlock:'latest'}, (error, logs)=>{
+                        logs.forEach(function(log){
+                            $('#event-log-pa').append("<p>Event:ProposalApproved:Approver:"+log.returnValues._approver +" Value: "+log.returnValues._valueInWei+ " Wei, Beneficiary: " + log.returnValues._beneficiary+ "</p>");
+                        });
+                    });
+                }
+                function eventsPR(){
+                    contract.getPastEvents("ProposalRejected",{fromBlock:0, toBlock:'latest'}, (error, logs)=>{
+                        logs.forEach(function(log){
+                            $('#event-log-pr').append("<p>Event:ProposalRejected:Rejected By:"+log.returnValues._approver +" Value: "+log.returnValues._valueInWei+ " Wei, Beneficiary: " + log.returnValues._beneficiary+ "</p>");
+                        });
+                    });
+                }
+                function eventsWP(){
+                    contract.getPastEvents("WithdrawPerformed",{fromBlock:0, toBlock:'latest'}, (error, logs)=>{
+                        logs.forEach(function(log){
+                            $('#event-log-wp').append("<p>Event:WithdrawPerformed:Value: "+log.returnValues._valueInWei+ " Wei, Beneficiary: " + log.returnValues._beneficiary+ "</p>");
+                        });
+                    });
+                }
+
+                //function loadEventListeners(){
+                //  //  contract.
+//
+                //    //contract.events.ReceivedContribution({fromBlock:0, toBlock:'latest'}, function(err,res){
+                //    //    if(!error){
+                //    //      
+                //    //        console.log("Received"+res.args._valueInWei + "From:"+ res.args._contributor );
+                //    //    }
+                //    //});
+                //    //contributionEvent.watch(function(err,res){
+                //    //    if(!error){
+                //    //        console.log("Received"+res.args._valueInWei + "From:"+ res.args._contributor );
+                //    //    }
+                //    //});
+                //        contract.events.ReceivedContribution({
+                //            filter: {}, // Using an array means OR: e.g. 20 or 23
+                //            fromBlock: 0
+                //        }, function(error, event){ console.log(event); })
+                //        .on('data', function(event){
+                //            console.log(event); // same results as the optional callback above
+                //        })
+                //        .on('error', console.error);
+//
+                //    }
+
+                
+            </script>
+        </head>
+        <body class="">
+            <div id="txid"></div>
+            <div id="receipt"></div>
+                <div class="wrapper ">
+                  <div class="sidebar" data-color="orange" data-background-color="white">
+                    <!--
+                      Tip 1: You can change the color of the sidebar using: data-color="purple | azure | green | orange | danger"
+              
+                      Tip 2: you can also add an image using data-image tag
+                  -->
+                    <div class="logo">
+                      <a href="#" class="simple-text">
+                        MultiSig DAO Interface
+                      </a>
+                    </div>
+                    <div class="sidebar-wrapper">
+                      <ul class="nav">
+                        <li class="nav-item active  ">
+                          <a class="nav-link" href="#">
+                            <i class="material-icons">dashboard</i>
+                            <p>Dashboard</p>
+                          </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="user.html">
+                              <i class="material-icons">person</i>
+                              <p>About Me</p>
+                            </a>
+                        </li>
+                      </ul>
+                    </div>
+                  </div>
+                  <div class="main-panel">
+                    <!-- Navbar -->
+                    <nav class="navbar navbar-expand-lg navbar-transparent navbar-absolute fixed-top ">
+                      <div class="container-fluid">
+                        <div class="navbar-wrapper">
+                          <a class="navbar-brand" href="#pablo">Dashboard</a>
+                        </div>
+                        <button class="navbar-toggler" type="button" data-toggle="collapse" aria-controls="navigation-index" aria-expanded="false" aria-label="Toggle navigation">
+                          <span class="sr-only">Toggle navigation</span>
+                          <span class="navbar-toggler-icon icon-bar"></span>
+                          <span class="navbar-toggler-icon icon-bar"></span>
+                          <span class="navbar-toggler-icon icon-bar"></span>
+                        </button>
+                      </div>
+                    </nav>
+                    <!-- End Navbar -->
+                    <div class="content">
+                      <div class="container-fluid">
+                        <!--Alert Section --> 
+                          <div class="row">
+                              <div class="col-md">
+                                  <div  class="alert alert-success" role="alert">
+                                      <strong id="metamask-alert">You successfully submitted your proposal. Hurray!</strong>
+                                      <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+                                              <span aria-hidden="true">&times;</span>
+                                      </button>
+                                  </div>
+                              </div>
+                              <div class="col-md">                                  
+                                    <a onClick='javascript:endContributionPhase()' style="color:white" class="btn btn-primary">End Contribution Phase</a>
+                                    <div id="endContributionPhase-txid" style="font-size: 11px;"></div>
+                                 <!-- <div class="card card-nav-tabs">
+                                      <div class="card-header card-header-info">
+                                        Current Phase: Contribution Phase
+                                      </div>
+                                      <div class="card-body">
+                                        <p class="card-text">Note that in this phase you can only contribute. You cannot propose</p>
+                                      </div>
+                                    </div> -->
+                              </div>
+                          </div>
+                        <!--End Alert Section -->   
+                        <!--Summary Section-->
+                        <div class="row">
+                            <div class="col-md">
+                                <div class="card card-stats">
+                                    <div class="card-header card-header-warning card-header-icon">
+                                      <div class="card-icon">
+                                          <i class="material-icons">group</i>
+                                      </div>
+                                      <p class="card-category">Contributors</p>
+                                      <h3 class="card-title" id="total-contributors">0</h3>
+                                    </div>
+                                    <!--
+                                    <div class="card-footer">
+                                        <div class="stats">
+                                            <i class="material-icons">info</i> Number of Proposals submitted
+                                        </div>
+                                    </div> -->
+                                </div>
+                            </div>
+                          
+                            <div class="col-md">
+                                <div class="card card-stats">
+                                    <div class="card-header card-header-success card-header-icon">
+                                      <div class="card-icon">
+                                        <i class="material-icons">bubble_chart</i>
+                                      </div>
+                                      <p class="card-category">Current Phase</p>
+                                      <h3 class="card-title" id="phase-output"></h3>
+                                    </div>
+                                    <!--
+                                    <div class="card-footer">
+                                        <div class="stats">
+                                            <i class="material-icons">info</i> Number of Proposals submitted
+                                        </div>
+                                    </div> -->
+                                </div>
+                            </div>
+                            <div class="col-md">
+                                <div class="card card-stats">
+                                    <div class="card-header card-header-primary card-header-icon">
+                                      <div class="card-icon">
+                                        <i class="material-icons">contact_mail</i>
+                                      </div>
+                                      <p class="card-category">Open Proposals</p>
+                                      <h3 class="card-title" id="total-open-proposals">0</h3>
+                                    </div>
+                                    <!--
+                                    <div class="card-footer">
+                                        <div class="stats">
+                                            <i class="material-icons">info</i> Number of Proposals submitted
+                                        </div>
+                                    </div> -->
+                                </div>
+                            </div>
+                          
+                          </div>
+                          <!--End Summary Section-->
+                          <!--Main Section-->
+                          
+                              <div class="row">
+                                <div class="col-md-6">
+                                <div class="row">
+                                  <div class="col-md-12">
+                                      <div class="card card-nav-tabs">
+                                          <div class="card-body">
+                                            <h4 class="card-title">Contribute</h4>
+                                            <p class="card-text">
+                                              <form>
+                                                <div class="input-group">
+                                                    <div class="input-group-prepend">
+                                                      <span class="input-group-text">
+                                                            <i class="fa fa-btc" aria-hidden="true"></i>
+                                                      </span>
+                                                    </div>
+                                                    <input type="text" id="contribute-value" class="form-control" placeholder="Enter Value in Wei">
+                                                    <div id="contribute-txid" style="font-size: 11px"></div>
+                                                  </div>
+                                                  
+                                                  <a onClick='javascript:contribute()' style="color:white" class="btn btn-primary">Contribute</a>
+                                              </form>
+                                              <br>
+                                              <h4 class="card-title">Check Contribution</h4>
+                                              <form>
+                                                    <div class="input-group">
+                                                        <div class="input-group-prepend">
+                                                          <span class="input-group-text">
+                                                                <i class="material-icons">videogame_asset</i>
+                                                          </span>
+                                                        </div>
+                                                        <input type="text" id="contributor-addr" class="form-control" placeholder="Enter contributor address to check his contribution">
+                                                        
+                                                      </div>
+                                                      <div id="contribution-value" style="font-size: 11px"></div>
+                                                      <a onClick='javascript:checkContribution()' style="color:white" class="btn btn-primary">Check Contribution</a>
+                                            </form><br>
+                                            <h4 class="card-title">Sign Transaction</h4>
+                                            <form>
+                                                    <div class="input-group">
+                                                        <div class="input-group-prepend">
+                                                          <span class="input-group-text">
+                                                              <i class="material-icons">how_to_vote</i>
+                                                          </span>
+                                                        </div>
+                                                        <input type="text" id="beneficiary-addr" class="form-control" placeholder="Enter Beneficiary Address">
+                                                        <div id="sign-txid" style="font-size: 11px"></div>
+                                                      </div>
+                                                      <div id="approve-txid" style="font-size: 11px"></div>
+                                                      <div id="reject-txid" style="font-size: 11px"></div>
+                                                      <br>
+                                                      <a onClick='javascript:approve()' style="color:white" class="btn btn-primary">Approve</a>
+                                                      <a onClick='javascript:reject()' style="color:white" class="btn btn-primary">Reject</a>
+                                            </form><br>
+
+
+                                            </p>
+                                          </div>
+                                        </div>
+                                  </div>
+                                </div>
+                                </div>
+                                <!--Proposal section-->
+                                  <div class="col-md-6">
+                                      <div class="card card-nav-tabs">
+                                          <div class="card-body">
+                                            <p class="card-text">
+                                                <h4 class="card-title">Send Proposal</h4>
+                                                <form>
+                                                        <div class="input-group">
+                                                            <div class="input-group-prepend">
+                                                                <span class="input-group-text">
+                                                                        <i class="material-icons">local_atm</i>
+                                                                </span>
+                                                        </div>
+                                                        <input type="text" id="proposal-value" class="form-control" placeholder="Enter Value in Wei">
+                                                        <div id="proposal-txid" style="font-size: 11px"></div>
+                                                        </div>
+                                                        <br>
+                                                        <a onClick='javascript:sendProposal()' style="color:white" class="btn btn-primary">Submit</a>
+                                                </form><br>
+                                                <h4 class="card-title">Withdraw</h4>
+                                                <form>
+                                                        <div class="input-group">
+                                                            <div class="input-group-prepend">
+                                                                <span class="input-group-text">
+                                                                        <i class="material-icons">local_atm</i>
+                                                                </span>
+                                                        </div>
+                                                        <input type="text" id="withdraw-value" class="form-control" placeholder="Enter Value in Wei">
+                                                        <div id="withdraw-txid" style="font-size: 11px"></div>
+                                                        </div>
+                                                        <br>
+                                                        <a onClick='javascript:withdrawReq()' style="color:white" class="btn btn-primary">Submit</a>
+                                                </form>
+                                            </p>
+                                            
+                                          </div>
+                                        </div>
+                                  </div>
+                               </div>
+                          
+                          <!--End Main Section-->
+                          <!--Events Section-->
+                          <div class="row">
+                            <div class="col-md-12">
+                                <div class="card card-nav-tabs">
+                                  <div class="card-header card-header-danger">
+                                    Event Logs
+                                  </div>
+                                  <div class="card-body">
+                                    <p class="card-text">
+                                        <h4 class="card-title" style="text-decoration: underline">List of recent events</h4>
+                                        <h5 class="card-title" style="text-decoration: underline">ReceivedContribution Events</h5>
+                                        <div id="event-log-rc"></div>
+                                        <h5 class="card-title" style="text-decoration: underline">Proposal Submitted Events</h5>
+                                        <div id="event-log-ps"></div>
+                                        <h5 class="card-title" style="text-decoration: underline">Proposal Approved Events</h5>
+                                        <div id="event-log-pa"></div>
+                                        <h5 class="card-title" style="text-decoration: underline">Proposal Rejected Events</h5>
+                                        <div id="event-log-pr"></div>
+                                        <h5 class="card-title" style="text-decoration: underline">Withdraw Performed Events</h5>
+                                        <div id="event-log-wp"></div>
+
+                                    </p>
+                                  </div>
+                                </div>
+                            </div>
+                          </div>
+                          <!--End Events Section-->
+                      </div>
+                    </div>
+                    <footer class="footer">
+                      <div class="container-fluid">
+                        <nav class="float-left">
+                          <ul>
+                            <li>
+                              <a href="#">
+                                Created By Suhas Ranganath
+                              </a>
+                            </li>
+                          </ul>
+                        </nav>
+                        <div class="copyright float-right">
+                          &copy;
+                          <script>
+                            document.write(new Date().getFullYear())
+                          </script>, Graduation Project for Consensys India Developer Program
+                        </div>
+                        <!-- your footer here -->
+                      </div>
+                    </footer>
+                  </div>
+                </div>
+            <!--   Core JS Files   -->
+            <script src="assets/js/core/jquery.min.js" type="text/javascript"></script>
+            <script src="assets/js/core/popper.min.js" type="text/javascript"></script>
+            <script src="assets/js/core/bootstrap-material-design.min.js" type="text/javascript"></script>
+            <script src="assets/js/plugins/perfect-scrollbar.jquery.min.js"></script>
+            <script src="assets/js/material-dashboard.min.js?v=2.1.0" type="text/javascript"></script>
+            <script src="./app_logic.js"></script>
+            <script>   
+
+                
+            </script>
+        </body>
+</html>
